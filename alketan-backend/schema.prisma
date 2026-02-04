@@ -1,0 +1,967 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                           String               @id @default(cuid())
+  email                        String               @unique
+  password                     String
+  firstName                    String
+  lastName                     String
+  name                         String
+  phone                        String?
+  avatar                       String?
+  bio                          String?
+  role                         UserRole             @default(USER)
+  adminLevel                   AdminLevel?
+  isActive                     Boolean              @default(true)
+  createdAt                    DateTime             @default(now())
+  updatedAt                    DateTime             @updatedAt
+  createdById                  String?
+  hotelId                      String?
+  failedLoginAttempts        Int                  @default(0)
+  lockoutUntil               DateTime?
+  lastFailedLogin            DateTime?
+  lastLoginAt                DateTime?
+
+  // Two-Factor Authentication fields
+  twoFactorEnabled           Boolean              @default(false)
+  twoFactorSecret            String?
+  twoFactorBackupCodes       String?
+  auditLogs                    AuditLog[]
+  bookings                     Booking[]
+  hotels                       Hotel[]              @relation("HotelManager")
+  loyaltyPoints                LoyaltyPoint?
+  loyaltyTransactions          LoyaltyTransaction[]
+  receivedMessages             Message[]            @relation("MessageReceiver")
+  messages                     Message[]            @relation("MessageSender")
+  notifications                Notification[]
+  reviews                      Review[]             @relation("UserReviews")
+  sessionLogs                  SessionLog[]
+  devices                      UserDevice[]
+  permissions                  UserPermission[]
+  createdBy                    User?                @relation("UserCreatedBy", fields: [createdById], references: [id])
+  createdUsers                 User[]               @relation("UserCreatedBy")
+  hotels_users_hotelIdTohotels Hotel?               @relation("users_hotelIdTohotels", fields: [hotelId], references: [id])
+  wishlist                     Wishlist[]           @relation("UserWishlist")
+  feedbacks                    Feedback[]
+
+  @@index([createdAt])
+  @@index([hotelId])
+  @@index([isActive])
+  @@index([role])
+  @@map("users")
+}
+
+model Hotel {
+  id                          String              @id @default(cuid())
+  name                        String
+  nameAr                      String?
+  description                 String?
+  descriptionAr               String?
+  address                     String
+  city                        String
+  state                       String?
+  country                     String
+  latitude                    Float?
+  longitude                   Float?
+  phone                       String?
+  email                       String?
+  website                     String?
+  hotelCode                   String?             @unique
+  managerId                   String
+  rating                      Float               @default(0)
+  totalReviews                Int                 @default(0)
+  checkInTime                 String              @default("15:00")
+  checkOutTime                String              @default("11:00")
+  isActive                    Boolean             @default(true)
+  amenities                   String[]
+  images                      String[]
+  policies                    String?
+  createdAt                   DateTime            @default(now())
+  updatedAt                   DateTime            @updatedAt
+  bookings                    Booking[]
+  discounts                   Discount[]
+  features                    HotelFeature[]
+  manager                     User                @relation("HotelManager", fields: [managerId], references: [id])
+  organizationHotels          OrganizationHotel[]
+  reviews                     Review[]            @relation("HotelReviews")
+  rooms                       Room[]
+  services                    Service[]
+  users_users_hotelIdTohotels User[]              @relation("users_hotelIdTohotels")
+  wishlist                    Wishlist[]          @relation("HotelWishlist")
+
+  @@index([city, country])
+  @@index([createdAt])
+  @@index([isActive])
+  @@index([managerId])
+  @@index([rating])
+  @@map("hotels")
+}
+
+model Room {
+  id            String          @id @default(cuid())
+  hotelId       String
+  type          RoomType
+  number        String
+  floor         Int?
+  capacity      Int             @default(1)
+  beds          Int             @default(1)
+  size          Float?          // حجم الغرفة بالمتر المربع
+  basePrice     Float
+  status        RoomStatus      @default(AVAILABLE)
+  description   String?
+  descriptionAr String?
+  amenities     String[]
+  images        String[]
+  isActive      Boolean         @default(true)
+  isAvailable   Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  bookings      Booking[]
+  maintenanceRecords MaintenanceRecord[]
+  inventory     RoomInventory[]
+  hotel              Hotel           @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@unique([hotelId, number])
+  @@index([createdAt])
+  @@index([hotelId, status])
+  @@index([status, isActive])
+  @@map("rooms")
+}
+
+model Booking {
+  id               String           @id @default(cuid())
+  userId           String
+  hotelId          String
+  roomId           String
+  bookingReference String           @unique
+  checkIn          DateTime
+  checkOut         DateTime
+  nights           Int
+  guests           Int              @default(1)
+  guestName        String?
+  guestEmail       String?
+  guestPhone       String?
+  specialRequests  String?
+  basePrice        Float
+  taxes            Float            @default(0)
+  discount         Float            @default(0)
+  totalPrice       Float
+  status           BookingStatus    @default(PENDING)
+  discountCode     String?
+  paymentStatus    PaymentStatus    @default(PENDING)
+  paymentMethod    String?
+  approvedBy       String?
+  approvedAt       DateTime?
+  rejectedBy       String?
+  rejectedAt       DateTime?
+  rejectionReason  String?
+  staffNotes       String?
+  guestDetails     GuestDetails?
+  feedback         Feedback?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  services         BookingService[]
+  hotel            Hotel            @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  room             Room             @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoice          Invoice?
+  payment          Payment?
+  qrCode           QRCode?
+  messages         BookingMessage[]
+  familyMembers    BookingFamilyMember[]
+  checkoutRequest  CheckoutRequest?
+  version         Int              @default(0)  // For Optimistic Locking
+
+  @@index([createdAt])
+  @@index([hotelId, checkIn, checkOut])
+  @@index([paymentStatus])
+  @@index([roomId, checkIn, checkOut])
+  @@index([status, checkOut])
+  @@index([userId, status])
+  @@index([version])  // For Optimistic Locking
+  @@map("bookings")
+}
+
+model QRCode {
+  id         String    @id @default(cuid())
+  bookingId  String    @unique
+  code       String    @unique
+  qrImageUrl String?
+  isScanned  Boolean   @default(false)
+  scannedAt  DateTime?
+  scannedBy  String?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  booking    Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@index([isScanned])
+  @@map("qr_codes")
+}
+
+model Feature {
+  id            String          @id @default(cuid())
+  name          String
+  nameAr        String?
+  description   String?
+  descriptionAr String?
+  icon          String?
+  category      FeatureCategory
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  hotels        HotelFeature[]
+
+  @@map("features")
+}
+
+model HotelFeature {
+  id        String   @id @default(cuid())
+  hotelId   String
+  featureId String
+  createdAt DateTime @default(now())
+  feature   Feature  @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@unique([hotelId, featureId])
+  @@map("hotel_features")
+}
+
+model Payment {
+  id            String    @id @default(cuid())
+  bookingId     String    @unique
+  amount        Float
+  currency      String    @default("USD")
+  status        String    @default("pending")
+  method        String    @default("card")
+  stripeId      String?
+  transactionId String?
+  paidAt        DateTime?
+  refundedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  booking       Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  userId     String
+  hotelId    String
+  bookingId  String?
+  rating     Int
+  comment    String?
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  hotel      Hotel    @relation("HotelReviews", fields: [hotelId], references: [id], onDelete: Cascade)
+  user       User     @relation("UserReviews", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([hotelId, rating])
+  @@index([isVerified])
+  @@index([userId])
+  @@map("reviews")
+}
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  hotelId   String
+  createdAt DateTime @default(now())
+  hotel     Hotel    @relation("HotelWishlist", fields: [hotelId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserWishlist", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, hotelId])
+  @@index([hotelId])
+  @@index([userId])
+  @@map("wishlist")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  isRead    Boolean   @default(false)
+  link      String?
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([type])
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model Service {
+  id          String           @id @default(cuid())
+  hotelId     String
+  name        String
+  nameAr      String?
+  description String?
+  price       Float
+  category    String
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  bookings    BookingService[]
+  hotel       Hotel            @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@map("services")
+}
+
+model BookingService {
+  id        String   @id @default(cuid())
+  bookingId   String
+  serviceId   String
+  quantity    Int      @default(1)
+  price       Float
+  status      String   @default("PENDING") // 'PENDING', 'APPROVED', 'COMPLETED', 'CANCELLED'
+  notes       String?
+  urgency     String   @default("NORMAL") // 'LOW', 'NORMAL', 'HIGH', 'URGENT'
+  requestedAt DateTime @default(now())
+  requestedBy String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("booking_services")
+}
+
+model Discount {
+  id          String   @id @default(cuid())
+  hotelId     String?
+  code        String   @unique
+  name        String
+  description String?
+  type        String
+  value       Float
+  minAmount   Float?
+  maxDiscount Float?
+  startDate   DateTime
+  endDate     DateTime
+  usageLimit  Int?
+  usedCount   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  hotel       Hotel?   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@map("discounts")
+}
+
+model Invoice {
+  id            String    @id @default(cuid())
+  bookingId      String    @unique
+  invoiceNumber  String    @unique
+  roomCharges    Float     @default(0)
+  serviceCharges Float     @default(0)
+  subtotal       Float
+  tax            Float     @default(0)
+  total          Float
+  status        String    @default("pending")
+  issuedAt      DateTime  @default(now())
+  dueDate       DateTime?
+  paidAt        DateTime?
+  pdfUrl             String?
+  amountDue           Float?
+  amountPaid          Float     @default(0)
+  paymentMethod       String?
+  isDeferred          Boolean   @default(false)
+  deferredTo          String?
+  deferredReason      String?
+  deferredApprovedBy  String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  booking       Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  deferredAccount     DeferredAccount?
+
+  @@map("invoices")
+}
+
+model LoyaltyPoint {
+  id           String               @id @default(cuid())
+  userId       String               @unique
+  points       Int                  @default(0)
+  tier         String               @default("BRONZE")
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions LoyaltyTransaction[]
+
+  @@map("loyalty_points")
+}
+
+model LoyaltyTransaction {
+  id             String       @id @default(cuid())
+  userId         String
+  loyaltyPointId String
+  points         Int
+  type           String
+  description    String?
+  bookingId      String?
+  createdAt      DateTime     @default(now())
+  loyaltyPoint   LoyaltyPoint @relation(fields: [loyaltyPointId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("loyalty_transactions")
+}
+
+model Game {
+  id          String        @id @default(cuid())
+  name        String
+  nameAr      String?
+  description String?
+  type        String
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  sessions    GameSession[]
+
+  @@map("games")
+}
+
+model GameSession {
+  id          String    @id @default(cuid())
+  userId      String
+  gameId      String
+  score       Int       @default(0)
+  status      String    @default("active")
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  game        Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@map("game_sessions")
+}
+
+model Contest {
+  id           String               @id @default(cuid())
+  name         String
+  nameAr       String?
+  description  String?
+  startDate    DateTime
+  endDate      DateTime
+  prize        String?
+  isActive     Boolean              @default(true)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  participants ContestParticipant[]
+
+  @@map("contests")
+}
+
+model ContestParticipant {
+  id        String   @id @default(cuid())
+  contestId String
+  userId    String
+  score     Int      @default(0)
+  rank      Int?
+  createdAt DateTime @default(now())
+  contest   Contest  @relation(fields: [contestId], references: [id], onDelete: Cascade)
+
+  @@unique([contestId, userId])
+  @@map("contest_participants")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  details    String?
+  ipAddress  String?
+  userAgent  String?
+  deviceFingerprint String?
+  metadata    String?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model SessionLog {
+  id                String    @id @default(cuid())
+  userId            String
+  token             String?
+  ipAddress         String?
+  userAgent         String?
+  deviceFingerprint String?   // إضافة بصمة الجهاز للأمان
+  loginAt           DateTime  @default(now())
+  logoutAt          DateTime?
+  expiresAt         DateTime?
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token, userId, ipAddress]) // إضافة index للبحث السريع
+  @@map("session_logs")
+}
+
+// نموذج لتتبع Refresh Tokens المستخدمة (لمنع Replay Attacks)
+model UsedRefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  usedAt    DateTime @default(now())
+  expiresAt DateTime // انتهاء صلاحية التوكن الأصلي
+
+  @@index([token])
+  @@index([userId])
+  @@map("used_refresh_tokens")
+}
+
+model Organization {
+  id            String              @id @default(cuid())
+  name          String
+  email         String?
+  phone         String?
+  address       String?
+  contactPerson String?
+  isActive      Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  hotels        OrganizationHotel[]
+
+  @@map("organizations")
+}
+
+model OrganizationHotel {
+  id             String       @id @default(cuid())
+  organizationId String
+  hotelId        String
+  discount       Float?       @default(0)
+  createdAt      DateTime     @default(now())
+  hotel          Hotel        @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, hotelId])
+  @@map("organization_hotels")
+}
+
+model GuestDetails {
+  id           String   @id @default(cuid())
+  bookingId    String   @unique
+  firstName    String
+  lastName     String
+  email        String?
+  phone        String?
+  nationality  String?
+  idType       String?
+  idNumber     String?
+  address      String?
+  specialNeeds String?
+  isVerified   Boolean  @default(false)
+  verifiedBy   String?
+  verifiedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("guest_details")
+}
+
+model BookingMessage {
+  id          String   @id @default(cuid())
+  bookingId   String
+  senderId    String
+  senderType  String   // 'staff' or 'guest'
+  message     String
+  messageType String   @default("text")
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([createdAt])
+  @@map("booking_messages")
+}
+
+model BookingFamilyMember {
+  id           String   @id @default(cuid())
+  bookingId    String
+  firstName    String
+  lastName     String
+  fullNameAr   String?
+  relation     String   // 'spouse', 'child', 'parent', 'sibling', 'other'
+  gender       String?  // 'male', 'female'
+  dateOfBirth  DateTime?
+  age          Int?
+  nationality  String?
+  idType       String?  // 'national_id', 'passport'
+  idNumber     String?
+  specialNeeds String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("booking_family_members")
+}
+
+model MaintenanceRecord {
+  id          String    @id @default(cuid())
+  roomId      String
+  reason      String
+  status      String    @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, CANCELLED
+  reportedBy  String
+  reportedAt  DateTime  @default(now())
+  completedAt DateTime?
+  cost        Float?
+  notes       String?
+  room        Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("maintenance_records")
+}
+
+model CheckoutRequest {
+  id               String   @id @default(cuid())
+  bookingId        String   @unique
+  status           String   @default("PENDING") // 'PENDING', 'APPROVED', 'REJECTED'
+  requestedBy      String
+  requestedAt      DateTime @default(now())
+  approvedBy       String?
+  approvedAt       DateTime?
+  rejectedBy       String?
+  rejectedAt       DateTime?
+  rejectionReason  String?
+  paymentStatus    String?  // 'PAID', 'DEFERRED', 'PENDING'
+  deferredTo       String?
+  deferredReason   String?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  booking          Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([status])
+  @@map("checkout_requests")
+}
+
+model Message {
+  id         String    @id @default(cuid())
+  senderId   String
+  receiverId String
+  subject    String?
+  content    String
+  isRead     Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  readAt     DateTime?
+  receiver   User      @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender     User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Payroll {
+  id        String    @id @default(cuid())
+  userId    String
+  hotelId   String?
+  amount    Float
+  period    String
+  status    String    @default("pending")
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("payroll")
+}
+
+model RoomInventory {
+  id        String   @id @default(cuid())
+  roomId    String
+  date      DateTime
+  available Int      @default(1)
+  reserved  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, date])
+  @@map("room_inventory")
+}
+
+model UserPermission {
+  id         String          @id @default(cuid())
+  userId     String
+  resourceId String?
+  createdAt  DateTime        @default(now())
+  permission PermissionType
+  scope      PermissionScope @default(PERSONAL)
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_permissions")
+}
+
+model UserDevice {
+  id                String   @id @default(cuid())
+  userId            String
+  deviceId          String
+  deviceType        String
+  pushToken         String?
+  isActive          Boolean  @default(true)
+  lastLogin         DateTime? @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deviceFingerprint String?  // بصمة الجهاز للأمان
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId])
+  @@map("user_devices")
+}
+
+model DeferredAccount {
+  id        String   @id @default(cuid())
+  userId    String
+  invoiceId String   @unique
+  amount    Float
+  status    String   @default("PENDING")
+  notes     String?
+  reason    String?
+  deferredTo  String?
+  approvedBy    String?
+  approvedAt    DateTime?
+  approvalNotes String?
+  rejectedBy      String?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  settledAt       DateTime?
+  settledBy       String?
+  settlementNotes String?
+  bookingId  String?
+  hotelId    String?
+  guestId    String?
+  totalAmount Float?
+  paidAmount Float?
+  dueDate    DateTime?
+  requestedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+}
+
+
+enum UserRole {
+  GUEST
+  USER
+  HOTEL_MANAGER
+  RECEPTIONIST
+  ACCOUNTANT
+  ADMIN
+}
+
+enum AdminLevel {
+  SUPER_ADMIN
+  SYSTEM_ADMIN
+  HOTEL_ADMIN
+  DEPARTMENT_HEAD
+  SUPERVISOR
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+  RESERVED
+  CLEANING
+  BLOCKED
+}
+
+enum RoomType {
+  SINGLE
+  DOUBLE
+  SUITE
+  DELUXE
+  FAMILY
+  PRESIDENTIAL
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  APPROVED
+  CHECKED_IN
+  CHECKED_OUT
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum FeatureCategory {
+  AMENITY
+  SERVICE
+  FACILITY
+  ENTERTAINMENT
+  DINING
+  BUSINESS
+  WELLNESS
+}
+
+enum PermissionScope {
+  GLOBAL
+  HOTEL
+  PERSONAL
+  DEPARTMENT
+}
+
+enum PermissionType {
+  SYSTEM_CONFIGURATION
+  SYSTEM_MONITORING
+  SYSTEM_BACKUP
+  SYSTEM_RESTORE
+  USER_CREATE
+  USER_READ
+  USER_UPDATE
+  USER_DELETE
+  USER_BLOCK
+  USER_UNBLOCK
+  HOTEL_CREATE
+  HOTEL_READ
+  HOTEL_UPDATE
+  HOTEL_DELETE
+  HOTEL_MANAGE_STAFF
+  HOTEL_FINANCIAL_REPORTS
+  HOTEL_ACCESS
+  BOOKING_CREATE
+  BOOKING_READ
+  BOOKING_UPDATE
+  BOOKING_DELETE
+  BOOKING_CANCEL
+  BOOKING_REFUND
+  FINANCIAL_VIEW
+  FINANCIAL_UPDATE
+  PAYMENT_PROCESS
+  INVOICE_GENERATED
+  FEEDBACK_SUBMITTED
+  DISCOUNT_MANAGE
+  PRICING_CONTROL
+  SECURITY_AUDIT
+  COMPLIANCE_MONITORING
+  DATA_EXPORT
+  DATA_DELETE
+  ACCESS_LOG_VIEW
+  ADMIN_PANEL_ACCESS
+  ROLE_MANAGEMENT
+  PERMISSION_MANAGEMENT
+  SYSTEM_LOGS_VIEW
+  GLOBAL_SETTINGS
+  ROOM_READ
+  ROOM_UPDATE
+  SERVICE_READ
+  NOTIFICATION_SEND
+  REVIEW_READ
+  WISHLIST_READ
+  FEEDBACK_MANAGE
+  FEEDBACK_VIEW
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String
+  bookingId String   @unique
+  rating    Int
+  category  String
+  comment   String?
+  pros      String[]
+  cons      String[]
+  isPublic  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("feedbacks")
+}
+
+enum SettingCategory {
+  GENERAL          // الإعدادات العامة
+  SYSTEM           // إعدادات النظام
+  BOOKING          // إعدادات الحجوزات
+  PAYMENT          // إعدادات الدفع
+  NOTIFICATION     // إعدادات الإشعارات
+  SECURITY         // إعدادات الأمان
+  LOYALTY          // برنامج ولاء العملاء
+  DISCOUNT         // إدارة الخصومات
+  HOTEL            // إعدادات الفنادق
+  USER             // إعدادات المستخدمين
+  EXPORT           // إعدادات التصدير
+  MAINTENANCE      // إعدادات الصيانة
+}
+
+enum SettingType {
+  BOOLEAN
+  STRING
+  NUMBER
+  JSON
+  DATE
+  DATETIME
+  ARRAY
+}
+
+enum SettingScope {
+  GLOBAL           // إعداد عام على مستوى النظام
+  HOTEL            // إعداد على مستوى الفندق
+  USER             // إعداد على مستوى المستخدم
+}
+
+model SystemSetting {
+  id          String        @id @default(cuid())
+  key         String        @unique
+  name        String
+  nameAr      String?
+  description String?
+  category    SettingCategory
+  type        SettingType
+  scope       SettingScope  @default(GLOBAL)
+  value       String?       // القيمة الافتراضية كـ JSON string
+  isSecret    Boolean       @default(false) // إعدادات سرية لا تُعرض
+  isEditable  Boolean       @default(true)
+  isActive    Boolean       @default(true)
+  sortOrder   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  values      SettingValue[]
+
+  @@index([category])
+  @@index([scope])
+  @@index([isActive])
+  @@map("system_settings")
+}
+
+model SettingValue {
+  id         String        @id @default(cuid())
+  settingId  String
+  scope      SettingScope
+  scopeId    String?       // hotelId أو userId حسب النطاق
+  value      String        // القيمة كـ JSON string
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  createdBy  String?
+  setting    SystemSetting @relation(fields: [settingId], references: [id], onDelete: Cascade)
+
+  @@unique([settingId, scope, scopeId])
+  @@index([scope, scopeId])
+  @@map("setting_values")
+}
