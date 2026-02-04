@@ -56,9 +56,9 @@ function createLimiter(prefix: string, limit: number, window: string) {
 
 // Rate Limiters مع إعدادات مُحسنة
 export const apiRateLimit = createLimiter('api', 100, '1 m')
-export const authRateLimit = createLimiter('auth', 50, '15 m')
-export const searchRateLimit = createLimiter('search', 30, '1 m')
-export const bookingRateLimit = createLimiter('booking', 10, '1 m')
+export const authRateLimit = createLimiter('auth', 200, '15 m')
+export const searchRateLimit = createLimiter('search', 200, '1 m')
+export const bookingRateLimit = createLimiter('booking', 200, '5 m')
 
 // Rate Limiter أكثر صرامة للمستخدمين ذوي الصلاحيات العالية
 export const adminRateLimit = createLimiter('admin', 50, '1 m')
