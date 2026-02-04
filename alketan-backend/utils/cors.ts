@@ -77,7 +77,7 @@ export function isOriginAllowed(origin: string | null): boolean {
  */
 export function applyCorsHeaders(response: NextResponse, requestOrigin: string | null): NextResponse {
   // إذا كان الأصل مسموح به، نطبقه
-  if (isOriginAllowed(requestOrigin)) {
+  if (requestOrigin && isOriginAllowed(requestOrigin)) {
     response.headers.set('Access-Control-Allow-Origin', requestOrigin);
   }
   
