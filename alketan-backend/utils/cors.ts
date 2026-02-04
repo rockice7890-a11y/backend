@@ -77,9 +77,9 @@ export function isOriginAllowed(origin: string | null): boolean {
  */
 export function applyCorsHeaders(response: NextResponse, requestOrigin: string | null): NextResponse {
   // إذا كان الأصل مسموح به، نطبقه
-  if (requestOrigin && isOriginAllowed(requestOrigin)) {
+   if (requestOrigin && isOriginAllowed(requestOrigin)) {
     response.headers.set('Access-Control-Allow-Origin', requestOrigin);
-  }
+}
   
   //_methods المسموح بها
   response.headers.set('Access-Control-Allow-Methods', CORS_CONFIG.allowedMethods.join(', '));
